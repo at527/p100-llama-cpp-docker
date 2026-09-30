@@ -13,7 +13,7 @@ This repo ships a ready-to-build llama.cpp with every patch already applied:
     # two P100s: tensor split is where patches 0003/0004 apply
     llama.cpp/build/bin/llama-server -m model.gguf -ngl 99 -sm tensor
 
-`llama.cpp/` is upstream **`b10660`** plus `patches/0001`-`0011`, nothing else;
+`llama.cpp/` is upstream **`b10660`** plus `patches/0001`-`0012`, nothing else;
 `tools/verify-source.sh` re-derives it from upstream and diffs to prove that. It is
 the exact source running on the machine these numbers came from.
 
@@ -141,6 +141,13 @@ fetched each activation four times. Four agents on qwen3.8-27b go from **16.0 to
 20.3 tok/s each**. The write-up covers the race that in-place state reads
 cannot have with one sequence but can with several: the recurrent memory reorders
 cells. [`docs/concurrent-decode.md`](docs/concurrent-decode.md)
+
+Patch `0012` keeps the special GQA-6 flash-attention tile ladder GP100-only.
+Patch `0010`'s `launch_fattn<256, 8, 6>` configuration has zero occupancy on an
+sm_61 P40 and triggers a launch assertion. Other architectures now use the
+existing power-of-two ladder, which handles a GQA ratio of six through its
+two-head kernel. The Q4_0 direct-tile and staging checks use the same GP100 gate
+so dispatch and allocation stay consistent.
 
 `0001` and `0002` are 61 added lines across two files: one architecture-neutral,
 the other guarded to GP100 and byte-identical SASS on every other card. `0003` and

@@ -1371,7 +1371,7 @@ static bool ggml_cuda_fattn_tile_q4_0_direct(const ggml_tensor * dst) {
         const char * s = getenv("GGML_CUDA_FA_TILE_Q4_0");
         return !s || atoi(s) != 0;
     }();
-    if (!enabled) {
+    if (!enabled || ggml_cuda_info().devices[ggml_cuda_get_device()].cc != GGML_CUDA_CC_PASCAL) {
         return false;
     }
 
@@ -1618,7 +1618,8 @@ static void launch_fattn_tile_switch_ncols2(ggml_backend_cuda_context & ctx, ggm
             // (its direct-dequant loads exist only there).
             const bool short_batch = Q->ne[1] >= 2 && Q->ne[1] <= 4 && K->ne[1] < 65536 &&
                                      K->type != GGML_TYPE_Q4_0 && dst->src[2]->type != GGML_TYPE_Q4_0;
-            if (use_gqa_opt && gqa_ratio % 6 == 0 && !short_batch) {
+            if (use_gqa_opt && gqa_ratio % 6 == 0 && !short_batch &&
+                ggml_cuda_info().devices[ggml_cuda_get_device()].cc == GGML_CUDA_CC_PASCAL) {
                 launch_fattn_tile_switch_ncols1<DKQ, DV, 6, use_logit_softcap>(ctx, dst);
                 return;
             }
