@@ -1,5 +1,102 @@
 # Faster llama.cpp decode on the Tesla P100 (GP100, sm_60)
 
+## Docker quick start
+
+This fork builds the bundled source with all 12 patches applied. The image includes
+`llama-server` with the browser chat UI, `llama-cli`, and `llama-bench`. It targets
+Linux amd64 and P100 (`sm_60`) by default, using CUDA 12.4.1 on Ubuntu 22.04.
+Building requires Docker with BuildKit and internet access for image and package
+downloads; it does not require a GPU or a host CUDA toolkit.
+
+To run it, install a Pascal-compatible NVIDIA driver and the
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+on the Docker host. Configure the toolkit for Docker and verify GPU access before
+starting the server:
+
+```bash
+docker run --rm --gpus all nvidia/cuda:12.4.1-runtime-ubuntu22.04 nvidia-smi
+```
+
+With Docker Compose v2 installed:
+
+```bash
+cp .env.example .env
+# Edit .env: set MODEL_DIR to an existing absolute directory and MODEL_FILE
+# to the GGUF filename within it. Quote values containing spaces.
+docker compose config
+docker compose up --build -d
+docker compose logs -f server
+```
+
+Open <http://localhost:8080> for browser chat. The API is at the same address:
+
+```bash
+curl http://localhost:8080/health
+curl http://localhost:8080/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"user","content":"Hello!"}],"max_tokens":32}'
+docker compose down
+```
+
+Models are mounted read-only at `/models` and are never included in the image.
+Missing model variables fail Compose configuration; a nonexistent model directory
+fails startup rather than creating an empty directory. A missing or incompatible
+GGUF produces a server error visible in the logs. The health check allows five
+minutes for model loading; increase `start_period` in `compose.yaml` for larger
+models if needed.
+
+Configuration in `.env`:
+
+| variable | default | purpose |
+|---|---|---|
+| `MODEL_DIR` | required | existing host directory containing models |
+| `MODEL_FILE` | required | GGUF filename or relative path within `MODEL_DIR` |
+| `HOST_BIND` | `127.0.0.1` | set to `0.0.0.0` to allow LAN access |
+| `HOST_PORT` | `8080` | host port for browser and API access |
+| `GPU_LAYERS` | `99` | number of model layers to offload |
+| `SPLIT_MODE` | `layer` | set to `tensor` for multiple P100s to use the patched internal AllReduce |
+| `CUDA_ARCH` | `60` | CUDA architectures; use `"60;61"` for P100 and P40 |
+| `JOBS` | `4` | parallel compile jobs; reduce if the build runs out of memory |
+
+Compose exposes all NVIDIA GPUs, following Docker's
+[GPU reservation configuration](https://docs.docker.com/compose/how-tos/gpu-support/).
+To restrict access, replace `count: all` with `device_ids: ["0"]` in `compose.yaml`.
+GPU layer count and split mode are runtime settings; changing `CUDA_ARCH` or `JOBS`
+requires rebuilding. The server retains upstream KV-cache defaults. For additional
+server flags, override Compose's command with a YAML argument list, for example
+`command: ["--parallel", "4"]`. CLI flags take precedence over the corresponding
+`LLAMA_ARG_*` environment variables.
+
+Build and run without Compose:
+
+```bash
+docker build -t p100-llama-cpp:local .
+# Optional: one image for both P100 and P40
+docker build --build-arg CUDA_ARCH='60;61' --build-arg JOBS=4 \
+  -t p100-llama-cpp:pascal .
+
+docker run --rm --gpus all \
+  --mount 'type=bind,source=/absolute/path/to/models,target=/models,readonly' \
+  -p 127.0.0.1:8080:8080 p100-llama-cpp:local \
+  -m /models/model.gguf -ngl 99
+
+docker run --rm -it --gpus all \
+  --mount 'type=bind,source=/absolute/path/to/models,target=/models,readonly' \
+  --entrypoint llama-cli p100-llama-cpp:local \
+  -m /models/model.gguf -ngl 99 -p 'Hello!' -n 32
+
+docker run --rm --gpus all \
+  --mount 'type=bind,source=/absolute/path/to/models,target=/models,readonly' \
+  --entrypoint llama-bench p100-llama-cpp:local \
+  -m /models/model.gguf -ngl 99 -p 128 -n 32 -r 1
+```
+
+For a runtime smoke check, run each binary with `--help` without GPU access, then
+run `docker run --rm --gpus all p100-llama-cpp:local --list-devices` and confirm a
+P100 is listed. With a model loaded, verify `/health`, browser chat, an API reply,
+CLI generation, and the benchmark above. On two P100s, repeat with
+`SPLIT_MODE=tensor` and inspect the server logs for both devices.
+
 ## Quick start
 
 This repo ships a ready-to-build llama.cpp with every patch already applied:

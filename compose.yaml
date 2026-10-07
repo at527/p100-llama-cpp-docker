@@ -1,0 +1,34 @@
+services:
+  server:
+    image: p100-llama-cpp:local
+    build:
+      context: .
+      args:
+        CUDA_ARCH: "${CUDA_ARCH:-60}"
+        JOBS: "${JOBS:-4}"
+    environment:
+      LLAMA_ARG_MODEL: "/models/${MODEL_FILE:?Set MODEL_FILE to a GGUF filename within MODEL_DIR}"
+      LLAMA_ARG_N_GPU_LAYERS: "${GPU_LAYERS:-99}"
+      LLAMA_ARG_SPLIT_MODE: "${SPLIT_MODE:-layer}"
+    volumes:
+      - type: bind
+        source: "${MODEL_DIR:?Set MODEL_DIR to an existing model directory}"
+        target: /models
+        read_only: true
+        bind:
+          create_host_path: false
+    ports:
+      - "${HOST_BIND:-127.0.0.1}:${HOST_PORT:-8080}:8080"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5m

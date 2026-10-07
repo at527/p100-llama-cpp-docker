@@ -6,3 +6,7 @@
 
 # build of the bundled llama.cpp
 /llama.cpp/build/
+
+# Local Docker configuration and models
+/.env
+/models/
