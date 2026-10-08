@@ -6,7 +6,8 @@
 .env.*
 !.env.example
 **/build
-**/build-*
+# Exclude build directory contents without excluding build-info source files.
+**/build-*/**
 **/node_modules
 **/.svelte-kit
 **/dist
@@ -17,3 +18,7 @@
 models
 bench
 data
+
+# CMake requires these source files, even when build-* paths are excluded.
+!llama.cpp/cmake/build-info.cmake
+!llama.cpp/common/build-info.cpp.in
