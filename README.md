@@ -6,7 +6,13 @@ This fork builds the bundled source with all 12 patches applied. The image inclu
 `llama-server` with the browser chat UI, `llama-cli`, and `llama-bench`. It targets
 Linux amd64 and P100 (`sm_60`) by default, using CUDA 12.4.1 on Ubuntu 22.04.
 Building requires Docker with BuildKit and internet access for image and package
-downloads; it does not require a GPU or a host CUDA toolkit.
+downloads; it does not require a GPU or a host CUDA toolkit. The root Dockerfile
+is adapted from the bundled `llama.cpp/.devops/cuda.Dockerfile`: Node 24 builds the
+bundled UI in a separate stage, and CMake embeds it in the server. The build keeps
+upstream's CUDA and CPU portability settings, using CUDA 12.4.1, Ubuntu 22.04,
+GCC 11, and `sm_60` for P100 support. The runtime includes the server, CLI, and
+benchmark instead of upstream's Python conversion tools. `CUDA_ARCH` and `JOBS`
+retain this fork's existing build argument names.
 
 To run it, install a Pascal-compatible NVIDIA driver and the
 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
