@@ -28,7 +28,7 @@ With Docker Compose v2 installed:
 ```bash
 cp .env.example .env
 # Edit .env: set MODEL_DIR to an existing absolute directory and MODEL_FILE
-# to the GGUF filename within it. Quote values containing spaces.
+# to the GGUF relative path within it. Quote values containing spaces.
 docker compose config
 docker compose up --build -d
 docker compose logs -f server
@@ -45,6 +45,13 @@ docker compose down
 ```
 
 Models are mounted read-only at `/models` and are never included in the image.
+For Hugging Face downloads, mount the entire `~/.cache/huggingface` directory
+and set `MODEL_FILE` to `hub/models--…/snapshots/<revision>/<filename>.gguf`
+(see `.env.example`). This preserves snapshot symlinks to the cached blobs;
+mounting only a snapshot directory leaves those links broken.
+The model path in `.env.example` is an example; replace it with the relative path
+to a GGUF you have downloaded, and set `MODEL_DIR` to its containing model or
+cache directory.
 Missing model variables fail Compose configuration; a nonexistent model directory
 fails startup rather than creating an empty directory. A missing or incompatible
 GGUF produces a server error visible in the logs. The health check allows five
@@ -61,8 +68,18 @@ Configuration in `.env`:
 | `HOST_PORT` | `8080` | host port for browser and API access |
 | `GPU_LAYERS` | `99` | number of model layers to offload |
 | `SPLIT_MODE` | `layer` | set to `tensor` for multiple P100s to use the patched internal AllReduce |
+| `CTX_SIZE` | `2048` | context window in tokens; increase if GPU memory permits |
 | `CUDA_ARCH` | `60` | CUDA architectures; use `"60;61"` for P100 and P40 |
 | `JOBS` | `4` | parallel compile jobs; reduce if the build runs out of memory |
+
+`CTX_SIZE=2048` is a conservative starting point for P100 memory use. Increase it
+for longer prompts and conversations if GPU memory permits; a larger context
+requires more KV-cache memory. With concurrent requests, the context available
+to each request also depends on the server's parallel-slot settings.
+
+After changing runtime settings in `.env`, run `docker compose up -d` to recreate
+the container with the new values. After changing `CUDA_ARCH` or `JOBS`, run
+`docker compose up --build -d` to rebuild the image and apply the changes.
 
 Compose exposes all NVIDIA GPUs, following Docker's
 [GPU reservation configuration](https://docs.docker.com/compose/how-tos/gpu-support/).

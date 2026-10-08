@@ -10,6 +10,7 @@ services:
       LLAMA_ARG_MODEL: "/models/${MODEL_FILE:?Set MODEL_FILE to a GGUF filename within MODEL_DIR}"
       LLAMA_ARG_N_GPU_LAYERS: "${GPU_LAYERS:-99}"
       LLAMA_ARG_SPLIT_MODE: "${SPLIT_MODE:-layer}"
+      LLAMA_ARG_CTX_SIZE: "${CTX_SIZE:-2048}"
     volumes:
       - type: bind
         source: "${MODEL_DIR:?Set MODEL_DIR to an existing model directory}"

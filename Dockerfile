@@ -48,7 +48,7 @@ RUN cmake -B build -DGGML_NATIVE=OFF -DGGML_CUDA=ON -DGGML_BACKEND_DL=ON \
         -DGGML_CPU_ALL_VARIANTS=ON -DLLAMA_BUILD_TESTS=OFF \
         -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCH}" \
         -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined . \
-    && cmake --build build --config Release -j"${JOBS}"
+    && cmake --build build --config Release --parallel "${JOBS}"
 
 RUN mkdir -p /app/lib && \
     find build -name "*.so*" -exec cp -P {} /app/lib \;
